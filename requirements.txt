@@ -1,0 +1,15 @@
+Flask
+flask-cors
+python-dotenv
+openai
+joblib
+numpy
+scikit-learn
+lime
+tensorflow
+xgboost
+catboost
+seaborn
+matplotlib
+matplotlib-inline
+pandas

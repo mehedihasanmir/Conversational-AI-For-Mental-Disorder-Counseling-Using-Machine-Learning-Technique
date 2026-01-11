@@ -11,9 +11,8 @@ const assessmentFormContainer = document.getElementById('assessment-form-contain
 const chatContainer = document.getElementById('chat-container');
 const mainContainer = document.getElementById('main-container');
 
-// --- Configuration ---
-const API_KEY = "AIzaSyCdhUj6MjNBQYxF63A8bN71Oa5UO25Vbsw"; 
-const GEMINI_API_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${API_KEY}`;
+// --- Configuration (Python backend URLs) ---
+const CHAT_API_URL = 'http://127.0.0.1:5000/chat';
 const PREDICTION_API_URL = 'http://127.0.0.1:5000/predict'; 
 
 // --- Chat History Management ---
@@ -25,22 +24,15 @@ function enableChatbot() {
     sendButton.disabled = false;
     userInput.focus();
     
-    // Hide assessment form and make it zero width to give space to chat
     assessmentFormContainer.classList.add('hidden', 'lg:w-0');
     assessmentFormContainer.classList.remove('lg:w-3/4'); 
     
-    // Adjust main container layout (remove horizontal spacing)
     mainContainer.classList.remove('lg:space-x-6'); 
-    // If you want the chat to center horizontally when full page:
-    // mainContainer.classList.add('lg:justify-center');
 
-    // Make chat container full width
     chatContainer.classList.remove('lg:w-1/4'); 
     chatContainer.classList.add('w-full', 'lg:w-full', 'max-w-4xl'); 
 
-    // Make chat history fill available height
     chatHistory.classList.remove('h-[35vh]', 'min-h-[35vh]'); 
-    // Using a calc to fill height, adjust 150px as needed for header/footer elements
     chatHistory.classList.add('h-[calc(100vh-200px)]'); 
 
     predictionResultDiv.classList.add('hidden'); 
@@ -51,20 +43,14 @@ function disableChatbotAndShowForm() {
     userInput.disabled = true;
     sendButton.disabled = true;
     
-    // Show assessment form and revert its width
     assessmentFormContainer.classList.remove('hidden', 'lg:w-0');
     assessmentFormContainer.classList.add('lg:w-3/4'); 
     
-    // Revert main container layout (add horizontal spacing)
     mainContainer.classList.add('lg:space-x-6');
-    // If you added centering, remove it:
-    // mainContainer.classList.remove('lg:justify-center');
 
-    // Revert chat container to its smaller width
     chatContainer.classList.remove('w-full', 'lg:w-full', 'max-w-4xl'); 
     chatContainer.classList.add('lg:w-1/4'); 
 
-    // Revert chat history height
     chatHistory.classList.remove('h-[calc(100vh-200px)]'); 
     chatHistory.classList.add('h-[35vh]', 'min-h-[35vh]'); 
 
@@ -80,7 +66,6 @@ function disableChatbotAndShowForm() {
         </div>
     `; 
 }
-
 
 // --- Chat UI Functions ---
 function appendMessage(message, sender) {
@@ -118,7 +103,7 @@ function formatBotResponse(text) {
     return formattedText;
 }
 
-// --- Gemini Chatbot Logic ---
+// --- Chat Function (calls Python backend) ---
 async function sendMessage() {
     const prompt = userInput.value.trim();
     if (!prompt) return;
@@ -135,37 +120,30 @@ async function sendMessage() {
     sendButton.disabled = true;
 
     try {
-        chatContext.push({ role: "user", parts: [{ text: prompt }] });
+        chatContext.push({ role: "user", content: prompt });
 
-        const payload = {
-            contents: chatContext
-        };
-
-        const response = await fetch(GEMINI_API_URL, {
+        const response = await fetch(CHAT_API_URL, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(payload)
+            body: JSON.stringify({ messages: chatContext })
         });
 
         if (!response.ok) {
             const errorData = await response.json();
-            throw new Error(`API error: ${response.status} ${response.statusText} - ${errorData.error.message}`);
+            throw new Error(errorData.error || 'Unknown error');
         }
 
         const result = await response.json();
 
-        if (result.candidates && result.candidates.length > 0 &&
-            result.candidates[0].content && result.candidates[0].content.parts &&
-            result.candidates[0].content.parts.length > 0) {
-            const botResponse = result.candidates[0].content.parts[0].text;
-            appendMessage(botResponse, 'bot');
-            chatContext.push({ role: "model", parts: [{ text: botResponse }] });
+        if (result.message) {
+            appendMessage(result.message, 'bot');
+            chatContext.push({ role: "assistant", content: result.message });
         } else {
             appendMessage("Sorry, I couldn't get a response from the bot.", 'bot');
         }
     } catch (error) {
-        console.error("Error sending message to Gemini API:", error);
-        appendMessage(`Error: ${error.message}. Please try again later.`, 'bot');
+        console.error("Error:", error);
+        appendMessage(`Error: ${error.message}. Please check the server.`, 'bot');
     } finally {
         loadingIndicator.classList.add('hidden');
         sendButton.disabled = false;
@@ -173,7 +151,7 @@ async function sendMessage() {
     }
 }
 
-// --- Prediction Logic ---
+// --- Prediction Function (calls Python backend) ---
 async function sendPredictionRequest(userInputs) {
     predictionResultDiv.classList.add('hidden'); 
     predictionResultDiv.classList.remove('bg-green-100', 'text-green-800', 'bg-red-100', 'text-red-800'); 
@@ -185,15 +163,13 @@ async function sendPredictionRequest(userInputs) {
     try {
         const response = await fetch(PREDICTION_API_URL, {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
+            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(userInputs),
         });
 
         if (!response.ok) {
             const errorData = await response.json();
-            throw new Error(`Prediction API error: ${response.status} ${response.statusText} - ${errorData.error || 'Unknown error'}`);
+            throw new Error(errorData.error || 'Unknown error');
         }
 
         const result = await response.json();
@@ -208,8 +184,8 @@ async function sendPredictionRequest(userInputs) {
 
         enableChatbot(); 
     } catch (error) {
-        console.error("Error fetching prediction:", error);
-        appendMessage(`Error getting prediction: ${error.message}. Please check the server and try again.`, 'bot');
+        console.error("Error:", error);
+        appendMessage(`Error: ${error.message}. Please check the server.`, 'bot');
 
         predictionResultDiv.textContent = `Prediction Error: ${error.message}`;
         predictionResultDiv.classList.remove('hidden');
@@ -222,7 +198,7 @@ async function sendPredictionRequest(userInputs) {
     }
 }
 
-// --- Event Listeners and Initial Setup ---
+// --- Event Listeners ---
 sendButton.addEventListener('click', sendMessage);
 userInput.addEventListener('keypress', (event) => {
     if (event.key === 'Enter') {
@@ -274,10 +250,6 @@ backToAssessmentButton.addEventListener('click', () => {
     disableChatbotAndShowForm();
 });
 
-// window.onload is no longer strictly necessary because initial state is in HTML
-// But keeping it ensures consistency on refresh/re-render if JS loads after content.
 window.onload = () => {
-    // This call is now primarily to ensure all JS initializations are done
-    // and to set the chatbot disabled state, which is also a "reset" to the form view.
     disableChatbotAndShowForm(); 
 };

@@ -4,13 +4,22 @@ from flask_cors import CORS
 import joblib
 import numpy as np
 from lime.lime_tabular import LimeTabularExplainer
+from openai import OpenAI
+from dotenv import load_dotenv
+
+# Load environment variables from .env file
+load_dotenv()
 
 app = Flask(__name__)
 CORS(app)
 
-# Load model
+# Initialize OpenAI client with API key from .env
+OPENAI_API_KEY = os.getenv('OPENAI_API_KEY')
+if not OPENAI_API_KEY or OPENAI_API_KEY == 'your-openai-api-key-here':
+    print("⚠️ Warning: OPENAI_API_KEY not set in .env file. Please configure it.")
+client = OpenAI(api_key=OPENAI_API_KEY)
 try:
-    model_path = os.path.join(os.path.dirname(__file__), 'mental_health_model.pkl')
+    model_path = os.path.join(os.path.dirname(__file__), 'catboost_mental_health_model.pkl')
     model = joblib.load(model_path)
     print("✅ Model loaded successfully!")
 except Exception as e:
@@ -104,6 +113,39 @@ else:
     except Exception as e:
         print(f"❌ Error initializing LIME Explainer with dummy data: {e}")
         lime_explainer = None
+
+
+@app.route('/chat', methods=['POST'])
+def chat():
+    """
+    Chat endpoint that uses OpenAI API.
+    Expects JSON with 'messages' containing conversation history.
+    """
+    try:
+        data = request.get_json()
+        if not data or 'messages' not in data:
+            return jsonify({"error": "No messages provided."}), 400
+
+        messages = data['messages']
+
+        # Call OpenAI API
+        response = client.chat.completions.create(
+            model="gpt-3.5-turbo",  # You can change to gpt-4 if available
+            messages=messages,
+            temperature=0.7,
+            max_tokens=500
+        )
+
+        # Extract the response
+        bot_message = response.choices[0].message.content
+
+        return jsonify({
+            "message": bot_message
+        })
+
+    except Exception as e:
+        print(f"❌ Chat API error: {e}")
+        return jsonify({"error": f"Chat failed: {str(e)}"}), 500
 
 
 @app.route('/predict', methods=['POST'])
@@ -227,5 +269,7 @@ def predict():
 if __name__ == '__main__':
     # Ensure you create 'mental_health_model.pkl' and 'training_data_sample.npy'
     # in the same directory as this app.py file before running.
-    # For local development, debug=True is useful. For production, set debug=False.
-    app.run(debug=True, port=5000)
+    # Configuration is loaded from .env file
+    port = int(os.getenv('SERVER_PORT', 5000))
+    debug = os.getenv('FLASK_DEBUG', 'True') == 'True'
+    app.run(debug=debug, port=port)
