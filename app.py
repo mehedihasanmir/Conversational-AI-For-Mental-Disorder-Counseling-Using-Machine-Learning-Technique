@@ -16,14 +16,14 @@ CORS(app)
 # Initialize OpenAI client with API key from .env
 OPENAI_API_KEY = os.getenv('OPENAI_API_KEY')
 if not OPENAI_API_KEY or OPENAI_API_KEY == 'your-openai-api-key-here':
-    print("⚠️ Warning: OPENAI_API_KEY not set in .env file. Please configure it.")
+    print("Warning: OPENAI_API_KEY not set in .env file.")
 client = OpenAI(api_key=OPENAI_API_KEY)
 try:
     model_path = os.path.join(os.path.dirname(__file__), 'catboost_mental_health_model.pkl')
     model = joblib.load(model_path)
-    print("✅ Model loaded successfully!")
+    print(" Model loaded successfully!")
 except Exception as e:
-    print(f"❌ Error loading model: {e}")
+    print(f"Error loading model: {e}")
     model = None
 
 # Load a sample of the training data for LIME
@@ -35,12 +35,12 @@ try:
     # Check if the file exists before attempting to load
     if os.path.exists(training_data_for_lime_path):
         training_data_for_lime = np.load(training_data_for_lime_path)
-        print("✅ Training data for LIME loaded successfully!")
+        print("Training data for LIME loaded successfully!")
     else:
         training_data_for_lime = None
-        print(f"⚠️ Warning: training_data_sample.npy not found at {training_data_for_lime_path}. LIME explanations will not be available unless initialized with dummy data or this file is provided.")
+        print(f"Warning: training_data_sample.npy not found at {training_data_for_lime_path}. LIME explanations will not be available unless initialized with dummy data or this file is provided.")
 except Exception as e:
-    print(f"❌ Error loading training data for LIME: {e}")
+    print(f"Error loading training data for LIME: {e}")
     training_data_for_lime = None
 
 
@@ -86,14 +86,14 @@ if training_data_for_lime is not None:
             mode='classification',
             discretize_continuous=True # Set to False if your features are all discrete/categorical
         )
-        print("✅ LIME Explainer initialized successfully with loaded training data")
+        print("LIME Explainer initialized successfully with loaded training data")
     except Exception as e:
-        print(f"❌ Error initializing LIME Explainer with loaded training data: {e}")
+        print(f"Error initializing LIME Explainer with loaded training data: {e}")
         lime_explainer = None
 else:
     # Fallback: Initialize LIME Explainer with minimal dummy data if real data is not found
     # NOTE: Explanations might be less reliable with limited dummy data.
-    print("⚠️ Initializing LIME Explainer with limited dummy data as a fallback.")
+    print("Initializing LIME Explainer with limited dummy data as a fallback.")
     dummy_training_data = np.array([
         [1, 6, 2, 3, 1, 2, 0, 2, 6, 7],  # Example 1
         [0, 3, 4, 4, 1, 4, 1, 4, 3, 2],  # Example 2
@@ -109,9 +109,9 @@ else:
             mode='classification',
             discretize_continuous=True
         )
-        print("✅ LIME Explainer initialized with fallback dummy data.")
+        print("LIME Explainer initialized with fallback dummy data.")
     except Exception as e:
-        print(f"❌ Error initializing LIME Explainer with dummy data: {e}")
+        print(f"Error initializing LIME Explainer with dummy data: {e}")
         lime_explainer = None
 
 
@@ -144,7 +144,7 @@ def chat():
         })
 
     except Exception as e:
-        print(f"❌ Chat API error: {e}")
+        print(f"Chat API error: {e}")
         return jsonify({"error": f"Chat failed: {str(e)}"}), 500
 
 
@@ -252,7 +252,7 @@ def predict():
                     explanation_text = "No significant features found for explanation."
 
             except Exception as e:
-                print(f"❌ LIME explanation error: {e}")
+                print(f"LIME explanation error: {e}")
                 explanation_text = f"Could not generate explanation due to LIME error: {e}"
 
         return jsonify({
@@ -262,7 +262,7 @@ def predict():
         })
 
     except Exception as e:
-        print(f"❌ Prediction error: {e}")
+        print(f"Prediction error: {e}")
         return jsonify({"error": f"Prediction failed: {e}"}), 500
 
 
